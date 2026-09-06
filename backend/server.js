@@ -8,16 +8,16 @@ app.use(cors());
 app.use(express.json());
 
 app.post('/api/submit', async (req, res) => {
-  const { title, message } = req.body;
-  if (!title || !message) {
-    return res.status(400).json({ error: 'Title and message are required' });
+  const { ciphertext, nonce, ephemeralPublicKey } = req.body;
+  if (!ciphertext || !nonce || !ephemeralPublicKey) {
+    return res.status(400).json({ error: 'Missing encrypted payload fields' });
   }
   try {
     const result = await pool.query(
-      'INSERT INTO submissions (title, message) VALUES ($1, $2) RETURNING id',
-      [title, message]
+      'INSERT INTO submissions (ciphertext, nonce, ephemeral_public_key) VALUES ($1, $2, $3) RETURNING id',
+      [ciphertext, nonce, ephemeralPublicKey]
     );
-    console.log('New submission received:', result.rows[0].id);
+    console.log('New encrypted submission received:', result.rows[0].id);
     res.status(201).json({ success: true, id: result.rows[0].id });
   } catch (err) {
     console.error(err);

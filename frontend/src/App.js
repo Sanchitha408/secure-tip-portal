@@ -1,4 +1,27 @@
 import { useState } from 'react';
+import nacl from 'tweetnacl';
+import naclUtil from 'tweetnacl-util';
+import { ADMIN_PUBLIC_KEY } from './publicKey';
+
+function encryptMessage(plaintext, recipientPublicKeyBase64) {
+  const recipientPublicKey = naclUtil.decodeBase64(recipientPublicKeyBase64);
+  const ephemeralKeyPair = nacl.box.keyPair();
+  const nonce = nacl.randomBytes(nacl.box.nonceLength);
+  const messageUint8 = naclUtil.decodeUTF8(plaintext);
+
+  const encrypted = nacl.box(
+    messageUint8,
+    nonce,
+    recipientPublicKey,
+    ephemeralKeyPair.secretKey
+  );
+
+  return {
+    ciphertext: naclUtil.encodeBase64(encrypted),
+    nonce: naclUtil.encodeBase64(nonce),
+    ephemeralPublicKey: naclUtil.encodeBase64(ephemeralKeyPair.publicKey),
+  };
+}
 
 function App() {
   const [title, setTitle] = useState('');
@@ -11,10 +34,13 @@ function App() {
     setLoading(true);
     setStatus('');
     try {
+      const payload = JSON.stringify({ title, message });
+      const encrypted = encryptMessage(payload, ADMIN_PUBLIC_KEY);
+
       const res = await fetch('http://localhost:5000/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, message }),
+        body: JSON.stringify(encrypted),
       });
       const data = await res.json();
       if (data.success) {
@@ -25,6 +51,7 @@ function App() {
         setStatus('error');
       }
     } catch (err) {
+      console.error(err);
       setStatus('error');
     } finally {
       setLoading(false);
@@ -46,7 +73,7 @@ function App() {
             Submit information securely
           </h1>
           <p className="text-neutral-400 mb-10 leading-relaxed">
-            Your submission is encrypted before it leaves your browser.
+            Your submission is encrypted in your browser before it is sent.
             We do not log IP addresses or require any identifying information.
           </p>
 
@@ -94,7 +121,7 @@ function App() {
 
           {status === 'success' && (
             <p className="mt-6 text-emerald-500 text-sm">
-              ✓ Submission received. Thank you for your report.
+              ✓ Submission received and encrypted. Thank you for your report.
             </p>
           )}
           {status === 'error' && (
